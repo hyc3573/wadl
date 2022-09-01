@@ -2,6 +2,8 @@ import pygame
 from pygame.locals import *
 from typing import Optional, Callable, Any, Union, Dict, cast
 from enum import Enum, auto
+from functools import reduce
+from operator import add
 
 jaeum = list('ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ')
 moeum = list('ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅛㅜㅠㅡㅣ')
@@ -46,7 +48,7 @@ def hangulCharToJamo(string: str) -> Optional[list[str]]:
 def hangulStrToJamo(string: str) -> list[list[str]]:
     return list(filter(None, map(hangulCharToJamo, string)))
 
-def qwertyToHangul(qwerty: str) -> Optional[list[list[str]]]:
+def qwertyToHangul(qwerty: str) -> tuple[list[list[str]], bool]:
     class Jamo(Enum):
         JA = auto()
         MO = auto()
@@ -68,15 +70,17 @@ def qwertyToHangul(qwerty: str) -> Optional[list[list[str]]]:
             seperation.append(char)
             state = Jamo.JA
 
-    print(seperation)
+    # print(seperation)
 
     # pass two: seperate jaeum
     state = Jamo.JA
     combined = []
-    for group in seperation:
+    for i, group in enumerate(seperation):
         if state == Jamo.JA:
             if len(group) == 2:
-                if group in jongcomp.keys(): # ㄱㅅ -> ㄳ
+                if group in jongcomp.keys() and \
+                   (i + 1 == len(seperation) or \
+                    seperation[i+1][0] in choseong): # ㄱㅅ -> ㄳ, 
                     combined.append(jongcomp[group])
                 else:
                     combined += list(group) # ㄱㄱ -> ㄱㄱ
@@ -105,7 +109,7 @@ def qwertyToHangul(qwerty: str) -> Optional[list[list[str]]]:
 
         state = Jamo.MO if state == Jamo.JA else Jamo.JA
 
-    print(combined)
+    # print(combined)
 
     # pass four: insert empty jongseong
     result = combined[:1]
@@ -132,7 +136,7 @@ def qwertyToHangul(qwerty: str) -> Optional[list[list[str]]]:
     if result[-1] in jungseong:
         result.append('')
 
-    print(result)
+    # print(result)
 
     # pass five: remove lone chracter
     
@@ -144,10 +148,9 @@ def qwertyToHangul(qwerty: str) -> Optional[list[list[str]]]:
             result[i] in chojong:
             nolone.append(result[i])
 
-    print(nolone)
-
     result = ['p'] + nolone[:] + ['p']
     nolone = []
+
     for i in range(1, len(result)-1):
         if result[i] in chojong and \
            (result[i-1] in jungseong or \
@@ -155,18 +158,31 @@ def qwertyToHangul(qwerty: str) -> Optional[list[list[str]]]:
             result[i] in jungseong:
             nolone.append(result[i])
 
+        elif result[i+1] == 'p' and \
+           result[i] in choseong:
+            nolone.append(result[i])
 
-    nolone = nolone if nolone[0] != '' else nolone[1:]
+    charFinished = False
+            
+    if len(nolone) >= 2:
+        nolone = nolone if nolone[0] != '' else nolone[1:]
         
-    print(nolone)
+    if len(nolone) %3 == 1:
+        nolone += ['', '']
+    elif len(nolone) %3 == 2:
+        nolone.append('')
+    else:
+        charFinished = True
+    # print(nolone)
 
-    return [[nolone[i], nolone[i+1], nolone[i+2]] for i in range(0, len(nolone), 3)]
+    return ([[nolone[i], nolone[i+1], nolone[i+2]] for i in range(0, len(nolone), 3)], charFinished) 
     
-print(qwertyToHangul('orrrhooodkssudgktpdyQOfxxxdho'))
+# print(qwertyToHangul('orrrhooodkssudgktpdyQOfxxxdho'))
 # print(qwertyToHangul('rkk'))
 # print(qwertyToHangul('rk'))
 # print(qwertyToHangul('r'))
-print(qwertyToHangul('OrrO'))
+# print(qwertyToHangul('OrrO'))
+# print(qwertyToHangul('rirehftidQkf'))
 
 WIDTH = 800
 HEIGHT = 700
@@ -176,17 +192,62 @@ def main():
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption('한글 워들')
 
+    pygame.key.start_text_input()
+    pygame.key.set_repeat(500, 50)
+
+    pygame.font.init()
+    font = pygame.font.SysFont("Noto Sans CJK KR BLACK", 50)
+
+    buffer = ''
+    string = [] 
+    bufferChanged = False
+
     while True:
         for event in pygame.event.get():
             if event.type == QUIT:
                 return
+            if event.type == KEYDOWN:
+                if event.key == K_BACKSPACE:
+                    if buffer:
+                        buffer = buffer[:-1]
+                        if not buffer:
+                            string[-1] = ['', '', '']
+                    elif string:
+                        string = string[:-1]
 
+                    bufferChanged = True
+            if event.type == TEXTINPUT:
+                if ('a' <= event.text and event.text <= 'z') or \
+                   ('A' <= event.text and event.text <= 'Z'):
+                    buffer += event.text
+                    bufferChanged = True
+
+        if bufferChanged:
+            temp, charFinished = qwertyToHangul(buffer)
+
+            if not string:
+                string.append(['', '', ''])
+
+            if len(temp) >= 1:
+                string[-1] = temp[0]
+
+            if len(temp) == 2:
+                string.append(temp[1])
+                temp = temp[-1:]
+                buffer = buffer[-2:]
+
+            bufferChanged = False
+                    
         screen.fill((0, 0, 0))
 
+        text = (reduce(add, reduce(add, string, []), ''))
         #draw
+        textDraw = font.render(text, True, (255, 255, 255))
+        screen.blit(textDraw, (WIDTH/2, HEIGHT/2))
         
         pygame.display.flip()
 
 
-if __name__ == '__main__': main()
+if __name__ == '__main__':
+    main()
 
