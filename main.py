@@ -1,16 +1,32 @@
 import pygame
 from pygame.locals import *
-from typing import Optional, Callable, Any, Union, Dict, cast
+from typing import Optional, Callable, Any, Union, Dict, Set, cast
 from enum import Enum, auto
 from functools import reduce
 from operator import add
+from random import shuffle
+from statistics import mean, median, mode, stdev
+
+WIDTH = 800
+HEIGHT = 700
+
+GREEN = (0, 255, 0)
+YELLOW = (255, 255, 0)
+GRAY = (127, 127, 127)
+
+TRIESYPOS = 200
+TRIESYOFFSET = 60
 
 jaeum = list('ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ')
 moeum = list('ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅛㅜㅠㅡㅣ')
 
-choseong  =      list('ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ')
-jungseong =      list('ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ')
-jongseong = ['']+list('ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ')
+choseong: list  =      list('ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ')
+jungseong: list =      list('ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ')
+jongseong: list = ['']+list('ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ')
+
+normalJung = list('ㅏㅐㅑㅒㅓㅔㅕㅖㅣ')
+bottomJung = list('ㅗㅛㅜㅠㅡ')
+doubleJung = list('ㅘㅙㅚㅝㅞㅟㅢ')
 
 chojong = [''] + list(set(choseong + jongseong))
 
@@ -29,6 +45,42 @@ jungcomp = {}
 jungcomp.update({'ㅗㅏ':'ㅘ','ㅗㅐ':'ㅙ','ㅗㅣ':'ㅚ'})
 jungcomp.update({'ㅜㅓ':'ㅝ','ㅜㅔ':'ㅞ','ㅜㅣ':'ㅟ'})
 jungcomp.update({'ㅡㅣ':'ㅢ'})
+
+CHARWIDTH = 100
+
+STRINGX = (WIDTH-CHARWIDTH*3)/2
+
+NORMALJUNGXOFFSET = 30
+NORMALJUNGYOFFSET = 0
+BOTTOMJUNGXOFFSET = 0
+BOTTOMJUNGYOFFSET = 20
+DOUBLEJUNGXOFFSET = 10
+DOUBLEJUNGYOFFSET = 13
+
+JONGYOFFSET = 40
+JONGXOFFSET = 0
+
+CHARHEIGHT = 85
+CHAROFFSET = 110
+
+dictionary = []
+with open('dict.txt', 'r') as f:
+    dictionary = f.readlines()
+
+def jamoToHangulChar(jamo: list[str]) -> str:
+    if not jamo[0]:
+        return ''
+    choIndex = choseong.index(jamo[0])
+    if not jamo[1]:
+        return jamo[0]
+    jungIndex = jungseong.index(jamo[1])
+    jongIndex = jongseong.index(jamo[2])
+
+    return chr(0xAC00 + 28 * 21 * choIndex + \
+               28 * jungIndex + jongIndex)
+
+def jamoToHangulStr(jamo: list[list[str]]) -> str:
+    return ''.join(list(map(jamoToHangulChar, jamo)))
 
 def hangulCharToJamo(string: str) -> Optional[list[str]]:
     if len(string) != 1:
@@ -113,7 +165,7 @@ def qwertyToHangul(qwerty: str) -> tuple[list[list[str]], bool]:
 
     # pass four: insert empty jongseong
     result = combined[:1]
-    if len(combined) >= 3:
+    if len(combined) > 3:
         for i in range(1, len(combined)-2):
             result.append(combined[i])
             # not a jaeum
@@ -129,6 +181,12 @@ def qwertyToHangul(qwerty: str) -> tuple[list[list[str]], bool]:
                 result.append('')
 
         result += combined[-2:]
+
+    if len(combined) == 3:
+        if combined[-1] not in jongseong: # ㅇ ㅏ ㅉ -> ㅇㅏ ㅉ
+            result = combined[:-1] + ['', combined[-1]]
+        else:
+            result = combined[:]
 
     if len(combined) == 2:
         result = combined[:]
@@ -176,18 +234,37 @@ def qwertyToHangul(qwerty: str) -> tuple[list[list[str]], bool]:
     # print(nolone)
 
     return ([[nolone[i], nolone[i+1], nolone[i+2]] for i in range(0, len(nolone), 3)], charFinished) 
+
+def check(submit: list[list[str]],
+          answer: list[list[str]],
+          answerSet: set[str]) -> tuple[list[list[tuple]], bool]:
+
+    result = []
+    passed = True
+    for i in range(3):
+        result.append([])
+        for j in range(3):
+            if submit[i][j] == answer[i][j]:
+                result[i].append(GREEN)
+            elif submit[i][j] in answerSet:
+                result[i].append(YELLOW)
+                passed = False
+            else:
+                result[i].append(GRAY)
+                passed = False
+
+    return (result, passed)
     
-# print(qwertyToHangul('orrrhooodkssudgktpdyQOfxxxdho'))
+# print(jamoToHangulStr(qwertyToHangul('orrrhooodkssudgktpdyQOfxxxdho')[0]))
 # print(qwertyToHangul('rkk'))
 # print(qwertyToHangul('rk'))
 # print(qwertyToHangul('r'))
 # print(qwertyToHangul('OrrO'))
 # print(qwertyToHangul('rirehftidQkf'))
 
-WIDTH = 800
-HEIGHT = 700
-
 def main():
+    tryCnt = []
+    
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption('한글 워들')
@@ -196,16 +273,25 @@ def main():
     pygame.key.set_repeat(500, 50)
 
     pygame.font.init()
-    font = pygame.font.SysFont("Noto Sans CJK KR BLACK", 50)
+    font = pygame.font.Font("nanum.ttf", 100)
+    sFont = pygame.font.Font("nanum.ttf", 50)
+
+    ansInd = 0
+    shuffle(dictionary)
+    answer = hangulStrToJamo(dictionary[ansInd])
+    answerset = set(reduce(add, answer, []))
+    lastPassInd = 0
 
     buffer = ''
     string = [] 
     bufferChanged = False
 
+    tries = []
+
     while True:
         for event in pygame.event.get():
             if event.type == QUIT:
-                return
+                exit(0)
             if event.type == KEYDOWN:
                 if event.key == K_BACKSPACE:
                     if buffer:
@@ -216,6 +302,36 @@ def main():
                         string = string[:-1]
 
                     bufferChanged = True
+                if event.key == K_RETURN:
+                    if len(string) == 3:
+                        result, passed = check(string, answer, answerset)
+                        tries.append((string,
+                                      result))
+                        string = []
+                        buffer = ''
+
+                        if passed:
+                            # new answer
+                            ansInd += 1
+                            answer = hangulStrToJamo(dictionary[ansInd])
+                            answerset = set(reduce(add, answer, []))
+
+                            # record
+                            tryCnt.append(len(tries) - lastPassInd)
+                            print(tryCnt)
+                            lastPassInd = len(tries)
+
+                if event.key == K_ESCAPE:
+                    # write to file
+                    with open("stat.csv", 'a') as f:
+                        sd = stdev(tryCnt) if len(tryCnt) >=2 else -1
+                        
+                        f.write(f'{mean(tryCnt)},{median(tryCnt)},')
+                        f.write(f'{mode(tryCnt)},{sd}\n')
+
+                    # reset
+                    return
+                    
             if event.type == TEXTINPUT:
                 if ('a' <= event.text and event.text <= 'z') or \
                    ('A' <= event.text and event.text <= 'Z'):
@@ -236,18 +352,42 @@ def main():
                 temp = temp[-1:]
                 buffer = buffer[-2:]
 
+            if len(string) > 3:
+                string = string[-3:]
+
             bufferChanged = False
                     
         screen.fill((0, 0, 0))
 
-        text = (reduce(add, reduce(add, string, []), ''))
-        #draw
-        textDraw = font.render(text, True, (255, 255, 255))
-        screen.blit(textDraw, (WIDTH/2, HEIGHT/2))
-        
+        for ind in range(max(0, len(tries)-6), len(tries)):
+            index = ind - max(0, len(tries)-6)
+            for n, i in enumerate(tries[ind][0]):
+                c = tries[ind][1][n]
+                cho = sFont.render(i[0], True, c[0])
+                screen.blit(cho, (STRINGX + CHARWIDTH*n, CHAROFFSET + CHARHEIGHT*index))
+
+                jung = sFont.render(i[1], True, c[1])
+                if i[1] in normalJung:
+                    screen.blit(jung, (STRINGX + CHARWIDTH*n+NORMALJUNGXOFFSET,
+                                       CHAROFFSET + CHARHEIGHT*index + NORMALJUNGYOFFSET))
+                elif i[1] in bottomJung:
+                    screen.blit(jung, (STRINGX + CHARWIDTH*n+BOTTOMJUNGXOFFSET,
+                                       CHAROFFSET + CHARHEIGHT*index + BOTTOMJUNGYOFFSET))
+                elif i[1] in doubleJung:
+                    screen.blit(jung, (STRINGX + CHARWIDTH*n+DOUBLEJUNGXOFFSET,
+                                       CHAROFFSET + CHARHEIGHT*index + DOUBLEJUNGYOFFSET))
+
+                jong = sFont.render(i[2], True, c[2])
+                screen.blit(jong, (STRINGX + CHARWIDTH*n+JONGXOFFSET,
+                                   CHAROFFSET + CHARHEIGHT*index + JONGYOFFSET))
+
+        text = font.render(jamoToHangulStr(string), True, (255, 255, 255))
+        screen.blit(text, ((WIDTH-text.get_rect().width)/2, 0))
+       
         pygame.display.flip()
 
 
 if __name__ == '__main__':
-    main()
+    while True:
+        main()
 
