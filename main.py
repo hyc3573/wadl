@@ -350,7 +350,7 @@ def main():
             if len(temp) == 2:
                 string.append(temp[1])
                 temp = temp[-1:]
-                buffer = buffer[-1:]
+                buffer = buffer[-len(reduce(add, temp[-1], '')):]
 
             if len(string) > 3:
                 string = string[-3:]
