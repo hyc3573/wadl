@@ -313,21 +313,25 @@ def main():
                         if passed:
                             # new answer
                             ansInd += 1
+                            if ansInd == len(dictionary):
+                                shuffle(dictinary)
+                                ansInd = 0
                             answer = hangulStrToJamo(dictionary[ansInd])
                             answerset = set(reduce(add, answer, []))
 
                             # record
                             tryCnt.append(len(tries) - lastPassInd)
-                            print(tryCnt)
+                            # print(tryCnt)
                             lastPassInd = len(tries)
 
                 if event.key == K_ESCAPE:
                     # write to file
-                    with open("stat.csv", 'a') as f:
-                        sd = stdev(tryCnt) if len(tryCnt) >=2 else -1
+                    if tryCnt:
+                        with open("stat.csv", 'a') as f:
+                            sd = stdev(tryCnt) if len(tryCnt) >=2 else -1
                         
-                        f.write(f'{mean(tryCnt)},{median(tryCnt)},')
-                        f.write(f'{mode(tryCnt)},{sd}\n')
+                            f.write(f'{mean(tryCnt)},{median(tryCnt)},')
+                            f.write(f'{mode(tryCnt)},{sd}\n')
 
                     # reset
                     return
