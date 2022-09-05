@@ -350,13 +350,13 @@ def main():
             if len(temp) == 2:
                 string.append(temp[1])
                 temp = temp[-1:]
-                buffer = buffer[-2:]
+                buffer = buffer[-1:]
 
             if len(string) > 3:
                 string = string[-3:]
 
             bufferChanged = False
-                    
+
         screen.fill((0, 0, 0))
 
         for ind in range(max(0, len(tries)-6), len(tries)):
