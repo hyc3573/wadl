@@ -10,6 +10,8 @@ from statistics import mean, median, mode, stdev
 WIDTH = 800
 HEIGHT = 700
 
+FPS = 30
+
 GREEN = (0, 255, 0)
 YELLOW = (255, 255, 0)
 GRAY = (127, 127, 127)
@@ -272,6 +274,8 @@ def main():
     pygame.key.start_text_input()
     pygame.key.set_repeat(500, 50)
 
+    clock = pygame.time.Clock()
+
     pygame.font.init()
     font = pygame.font.Font("nanum.ttf", 100)
     sFont = pygame.font.Font("nanum.ttf", 50)
@@ -389,6 +393,8 @@ def main():
         screen.blit(text, ((WIDTH-text.get_rect().width)/2, 0))
        
         pygame.display.flip()
+
+        clock.tick(FPS)
 
 
 if __name__ == '__main__':
