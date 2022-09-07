@@ -243,7 +243,7 @@ def check(submit: list[list[str]],
 
     result = []
     passed = True
-    for i in range(3):
+    for i in range(4):
         result.append([])
         for j in range(3):
             if submit[i][j] == answer[i][j]:
@@ -255,7 +255,7 @@ def check(submit: list[list[str]],
                 result[i].append(GRAY)
                 passed = False
 
-    return (result, passed)
+    return (result, passed and len(submit) == len(answer))
     
 # print(jamoToHangulStr(qwertyToHangul('orrrhooodkssudgktpdyQOfxxxdho')[0]))
 # print(qwertyToHangul('rkk'))
@@ -307,7 +307,7 @@ def main():
 
                     bufferChanged = True
                 if event.key == K_RETURN:
-                    if len(string) == 3:
+                    if len(string) == 4:
                         result, passed = check(string, answer, answerset)
                         tries.append((string,
                                       result))
@@ -318,7 +318,7 @@ def main():
                             # new answer
                             ansInd += 1
                             if ansInd == len(dictionary):
-                                shuffle(dictinary)
+                                shuffle(dictionary)
                                 ansInd = 0
                             answer = hangulStrToJamo(dictionary[ansInd])
                             answerset = set(reduce(add, answer, []))
@@ -360,8 +360,8 @@ def main():
                 temp = temp[-1:]
                 buffer = buffer[-len(reduce(add, temp[-1], '')):]
 
-            if len(string) > 3:
-                string = string[-3:]
+            if len(string) > 4:
+                string = string[-4:]
 
             bufferChanged = False
 
